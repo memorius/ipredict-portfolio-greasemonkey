@@ -63,9 +63,13 @@ function getStockName(tr) {
     }
 }
 
+function getColumn(tr, column) {
+    return tr.getElements("td")[column];
+}
+
 function getColumnText(tr, column) {
     // <tr><td>0</td><td>1</td>
-    return tr.getElements("td")[column].textContent;
+    return getColumn(tr, column).textContent;
 }
 
 function getStockQuantity(tr, column) {
@@ -74,7 +78,7 @@ function getStockQuantity(tr, column) {
 
 function getStockPrice(tr, column) {
     // <tr>...<td><span class="price">1</span></td> - index the td because there are several price columns
-    var price = tr.getElements("td")[column].getElementsByClassName("price")[0].textContent;
+    var price = getColumn(tr, column).getElementsByClassName("price")[0].textContent;
     return parseFloat(price.replace("$", ""));
 }
 
@@ -94,6 +98,18 @@ function addTD(tr, columnIndex, text, className) {
     td.className = className;
     tr.insertBefore(td, tr.getChildren()[columnIndex]);
     return td;
+}
+
+function colorQtyColumn(tr, columnIndex, qty) {
+    var className = qtyClass((qty === null) ? getStockQuantity(tr, columnIndex) : qty);
+    getColumn(tr, columnIndex).className += " " + className;
+}
+
+function colorActiveOrdersColumns(tr, typeColumnIndex, qtyColumnIndex) {
+    var typeColumn = getColumn(tr, typeColumnIndex);
+    var sign = (typeColumn.textContent === "Sell") ? -1 : 1;
+    colorQtyColumn(tr, typeColumnIndex, sign);
+    colorQtyColumn(tr, qtyColumnIndex, sign);
 }
 
 function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
@@ -226,6 +242,7 @@ try {
         tr = stockIOwnBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, stockIOwn);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, stockIOwn);
         }
@@ -238,6 +255,7 @@ try {
         tr = shortedStockBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, shortedStock);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, shortedStock);
         }
@@ -251,6 +269,7 @@ try {
         tr = activeOrdersBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            colorActiveOrdersColumns(tr, 1, 2);
             addHoldingsColumn(tr, 1, stockName, stockIOwn);
             addHoldingsColumn(tr, 2, stockName, shortedStock);
             addHoldingsAverageCostColumn(tr, 3, stockName, stockIOwn, shortedStock);
