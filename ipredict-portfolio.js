@@ -101,13 +101,19 @@ function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
     var orderQty = orders[stockName];
     var td = addTD(tr, columnIndex, orderQty || null, "align-right", "#0061E4");
     if (orderQty) {
-        // Highlight if there is a holding, and an order in the direction that will reduce this holding,
-        // but it is not of the same amount as the holding (hence the order needs editing)
-        var heldQty = (holdings && holdings[stockName].qty);
-        if (heldQty
-                && ((heldQty > 0) != (orderQty > 0))
-                && (Math.abs(heldQty) != Math.abs(orderQty))) {
+        // Bold if this order is one that will increase the portfolio
+        // (i.e. one which is not in the opposite direction to an existing holding)
+        var heldQty = holdings[stockName] && holdings[stockName].qty;
+        if (!heldQty
+                || ((heldQty > 0) == (orderQty > 0))) {
             td.style.fontWeight = "bold";
+        }
+        // Underline if there is an existing holding, and this order will reduce it,
+        // but the quantity is different (hence order probably needs editing)
+        else if (heldQty
+                 && ((heldQty > 0) != (orderQty > 0))
+                 && (Math.abs(heldQty) != Math.abs(orderQty))) {
+            td.style.textDecoration = "underline";
         }
     }
 }
@@ -238,8 +244,8 @@ try {
             addHoldingsColumn(tr, 1, stockName, stockIOwn);
             addHoldingsColumn(tr, 2, stockName, shortedStock);
             addHoldingsAverageCostColumn(tr, 3, stockName, stockIOwn, shortedStock);
-            addOrdersColumn(tr, 4, stockName, activeBuyOrders);
-            addOrdersColumn(tr, 5, stockName, activeSellOrders);
+            addOrdersColumn(tr, 4, stockName, activeBuyOrders, shortedStock);
+            addOrdersColumn(tr, 5, stockName, activeSellOrders, stockIOwn);
         }
     }
 
