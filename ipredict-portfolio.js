@@ -86,49 +86,68 @@ function addHeaderColumn(table, columnIndex, text, className) {
     thead.insertBefore(th, thead.getChildren()[columnIndex]);
 }
 
-function addTD(tr, columnIndex, text, className, color) {
+function addTD(tr, columnIndex, text, className) {
     var td = document.createElement("td");
     if (text !== null) {
         td.appendChild(document.createTextNode("" + text));
     }
     td.className = className;
-    td.style.color = color;
     tr.insertBefore(td, tr.getChildren()[columnIndex]);
     return td;
 }
 
 function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
     var orderQty = orders[stockName];
-    var td = addTD(tr, columnIndex, orderQty || null, "align-right", "#0061E4");
+    var styles = ["align-right", "custom-orders"];
     if (orderQty) {
         // Bold if this order is one that will increase the portfolio
         // (i.e. one which is not in the opposite direction to an existing holding)
         var heldQty = holdings[stockName] && holdings[stockName].qty;
         if (!heldQty
                 || ((heldQty > 0) == (orderQty > 0))) {
-            td.style.fontWeight = "bold";
+            styles.push("custom-orders-increase-portfolio");
         }
         // Underline if there is an existing holding, and this order will reduce it,
         // but the quantity is different (hence order probably needs editing)
         else if (heldQty
                  && ((heldQty > 0) != (orderQty > 0))
                  && (Math.abs(heldQty) != Math.abs(orderQty))) {
-            td.style.textDecoration = "underline";
+            styles.push("custom-orders-highlighted");
         }
     }
+    addTD(tr, columnIndex, orderQty || null, styles.join(" "));
 }
 
 function addHoldingsColumn(tr, columnIndex, stockName, holdings) {
     var holding = holdings[stockName];
-    addTD(tr, columnIndex, holding ? holding.qty : null, "align-right", "#AAAA00");
+    addTD(tr, columnIndex, holding ? holding.qty : null, "align-right custom-holdings");
 }
 
 function addHoldingsAverageCostColumn(tr, columnIndex, stockName, stockIOwn, shortedStock) {
     var holding = stockIOwn[stockName] || shortedStock[stockName];
-    addTD(tr, columnIndex, holding ? holding.avgCost : null, "align-center", "#AAAA00");
+    addTD(tr, columnIndex, holding ? holding.avgCost : null, "align-center custom-holdings");
 }
 
 try {
+    // Inject extra styles we will use for the new columns
+    var style = document.createElement("style");
+    style.type = "text/css";
+    style.innerHTML = [
+             "td.custom-orders {",
+             "    color: #AAAA00;",
+             "}",
+             "td.custom-orders-increase-portfolio {",
+             "    font-weight: bold;",
+             "}",
+             "td.custom-orders-highlighted {",
+             "    text-decoration: underline;",
+             "}",
+             "td.custom-holdings {",
+             "    color: #0061E4;",
+             "}"
+         ].join("\n");
+    document.getElementsByTagName('head')[0].appendChild(style);
+
     // Get the tables we are going to read data from and add columns to
     var activeOrdersTable  = findTable("active-orders");
     var stockIOwnTable     = findTable("long-stock");
