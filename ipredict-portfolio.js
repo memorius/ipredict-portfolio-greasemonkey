@@ -98,8 +98,9 @@ function addTD(tr, columnIndex, text, className) {
 
 function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
     var orderQty = orders[stockName];
-    var styles = ["align-right", "custom-orders"];
+    var styles = ["align-right"];
     if (orderQty) {
+        styles.push(qtyClass(orderQty));
         // Bold if this order is one that will increase the portfolio
         // (i.e. one which is not in the opposite direction to an existing holding)
         var heldQty = holdings[stockName] && holdings[stockName].qty;
@@ -120,12 +121,20 @@ function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
 
 function addHoldingsColumn(tr, columnIndex, stockName, holdings) {
     var holding = holdings[stockName];
-    addTD(tr, columnIndex, holding ? holding.qty : null, "align-right custom-holdings");
+    var qty = holding ? holding.qty : null;
+    addTD(tr, columnIndex, qty, "align-right " + qtyClass(qty));
 }
 
 function addHoldingsAverageCostColumn(tr, columnIndex, stockName, stockIOwn, shortedStock) {
     var holding = stockIOwn[stockName] || shortedStock[stockName];
-    addTD(tr, columnIndex, holding ? holding.avgCost : null, "align-center custom-holdings");
+    addTD(tr, columnIndex, holding ? holding.avgCost : null, "align-center custom-holdings-price");
+}
+
+function qtyClass(qty) {
+    if (qty === null) {
+        return "";
+    }
+    return (qty > 0) ? "positive" : "negative";
 }
 
 try {
@@ -133,17 +142,15 @@ try {
     var style = document.createElement("style");
     style.type = "text/css";
     style.innerHTML = [
-             "td.custom-orders {",
-             "    color: #AAAA00;",
-             "}",
              "td.custom-orders-increase-portfolio {",
              "    font-weight: bold;",
              "}",
              "td.custom-orders-highlighted {",
              "    text-decoration: underline;",
              "}",
-             "td.custom-holdings {",
+             "td.custom-holdings-price {",
              "    color: #0061E4;",
+             // "    color: #AAAA00;",
              "}"
          ].join("\n");
     document.getElementsByTagName('head')[0].appendChild(style);
