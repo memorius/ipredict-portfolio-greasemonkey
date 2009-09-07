@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name           iPredict-portfolio-improved-active-orders
-// @namespace      ipredict
+// @namespace      http://github.com/memorius/ipredict-portfolio-greasemonkey
 // @description    iPredict (My Portfolio): show active order info per holding and holdings per order
 // @include        https://www.ipredict.co.nz/Main.php?do=portfolio*
+// @include        https://www.ipredict.co.nz/Main.php?do=edit_order*
 // ==/UserScript==
 
 /* This script customizes iPredict's My Portfolio page to add extra columns
@@ -30,6 +31,14 @@
  * To Public License, Version 2, as published by Sam Hocevar. See
  * http://sam.zoy.org/wtfpl/COPYING for more details. */
 
+
+/* Allow script to be used on the return to My Portfolio after the last step of editing an order:
+   this returns to the My Portfolio page, but it's shown with the 'edit_order' URL the first time.
+   So we have to @include the edit_order URL, but exclude the other steps before the return to
+   My Portfolio: they have different page title. */
+if (!document.title.match("My Portfolio")) {
+    return;
+}
 
 function findTable(id) {
    // <div id="" class="page-sub-section">
