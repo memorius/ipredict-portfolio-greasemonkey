@@ -101,7 +101,7 @@ function addTD(tr, columnIndex, text, className) {
 }
 
 function colorQtyColumn(tr, columnIndex, qty) {
-    var className = qtyClass((qty === null) ? getStockQuantity(tr, columnIndex) : qty);
+    var className = qtyClass((qty === undefined) ? getStockQuantity(tr, columnIndex) : qty);
     getColumn(tr, columnIndex).className += " " + className;
 }
 
