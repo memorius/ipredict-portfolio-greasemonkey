@@ -105,44 +105,62 @@ function colorQtyColumn(tr, columnIndex, qty) {
     getColumn(tr, columnIndex).className += " " + className;
 }
 
-function colorActiveOrdersColumns(tr, typeColumnIndex, qtyColumnIndex) {
+function colorActiveOrdersColumns(tr, typeColumnIndex, qtyColumnIndex, holdings) {
     var typeColumn = getColumn(tr, typeColumnIndex);
     var sign = (typeColumn.textContent === "Sell") ? -1 : 1;
+    // Type
     colorQtyColumn(tr, typeColumnIndex, sign);
+    // Stock qty
     colorQtyColumn(tr, qtyColumnIndex, sign);
+    var heldQty = holdings[stockName] && holdings[stockName].qty;
+    var orderStyles = getCustomOrderStyles(sign * getStockQuantity(tr, qtyColumnIndex), heldQty);
+    if (orderStyles.length > 0) {
+        getColumn(tr, qtyColumnIndex).className += " " + orderStyles.join(" ");
+    }
+}
+
+function getCustomOrderStyles(orderQty, heldQty) {
+    var styles = [];
+    styles.push(qtyClass(orderQty));
+    // Bold if this order is one that will increase the portfolio
+    // (i.e. one which is not in the opposite direction to an existing holding)
+    if (!heldQty
+            || ((heldQty > 0) == (orderQty > 0))) {
+        styles.push("custom-orders-increase-portfolio");
+    }
+    // Underline if there is an existing holding, and this order will reduce it,
+    // but the quantity is different (hence order probably needs editing)
+    else if (heldQty
+             && ((heldQty > 0) != (orderQty > 0))
+             && (Math.abs(heldQty) != Math.abs(orderQty))) {
+        styles.push("custom-orders-highlighted");
+    }
+    return styles;
 }
 
 function addOrdersColumn(tr, columnIndex, stockName, orders, holdings) {
     var orderQty = orders[stockName];
     var styles = ["align-right"];
     if (orderQty) {
-        styles.push(qtyClass(orderQty));
-        // Bold if this order is one that will increase the portfolio
-        // (i.e. one which is not in the opposite direction to an existing holding)
         var heldQty = holdings[stockName] && holdings[stockName].qty;
-        if (!heldQty
-                || ((heldQty > 0) == (orderQty > 0))) {
-            styles.push("custom-orders-increase-portfolio");
-        }
-        // Underline if there is an existing holding, and this order will reduce it,
-        // but the quantity is different (hence order probably needs editing)
-        else if (heldQty
-                 && ((heldQty > 0) != (orderQty > 0))
-                 && (Math.abs(heldQty) != Math.abs(orderQty))) {
-            styles.push("custom-orders-highlighted");
-        }
+        styles = styles.concat(getCustomOrderStyles(orderQty, heldQty));
     }
     addTD(tr, columnIndex, orderQty || null, styles.join(" "));
 }
 
-function addHoldingsColumn(tr, columnIndex, stockName, holdings) {
+function addHoldingsColumn(tr, columnIndex, stockName, holdings, type) {
     var holding = holdings[stockName];
-    var qty = holding ? holding.qty : null;
+    var qty = null;
+    if (holding
+            && (  (type === "Long" && holding.qty > 0)
+               || (type === "Short" && holding.qty < 0))) {
+        qty = holding.qty;
+    }
     addTD(tr, columnIndex, qty, "align-right " + qtyClass(qty));
 }
 
-function addHoldingsAverageCostColumn(tr, columnIndex, stockName, stockIOwn, shortedStock) {
-    var holding = stockIOwn[stockName] || shortedStock[stockName];
+function addHoldingsAverageCostColumn(tr, columnIndex, stockName, holdings) {
+    var holding = holdings[stockName];
     addTD(tr, columnIndex, holding ? holding.avgCost : null, "align-center custom-holdings-price");
 }
 
@@ -182,8 +200,7 @@ try {
     var shortedStockBodyRows = getBodyRows(shortedStockTable);
     var watchListBodyRows    = getBodyRows(watchListTable);
 
-    var stockIOwn    = [];
-    var shortedStock = [];
+    var holdings    = [];
     var activeSellOrders = [];
     var activeBuyOrders = [];
 
@@ -196,8 +213,8 @@ try {
         if (stockName !== null) {
             qty = getStockQuantity(tr, 1);
             avgCost = getStockPrice(tr, 2);
-            stockIOwn[stockName] = { qty: qty, avgCost: avgCost };
-            // alert(stockName + ":" + stockIOwn[stockName].qty + "/" + stockIOwn[stockName].avgCost);
+            holdings[stockName] = { qty: qty, avgCost: avgCost };
+            // alert(stockName + ":" + holdings[stockName].qty + "/" + holdings[stockName].avgCost);
         }
     }
 
@@ -208,8 +225,8 @@ try {
         if (stockName !== null) {
             qty = getStockQuantity(tr, 1);
             avgCost = getStockPrice(tr, 2);
-            shortedStock[stockName] = { qty: qty, avgCost: avgCost };
-            // alert(stockName + ":" + shortedStock[stockName].qty + "/" + shortedStock[stockName].avgCost);
+            holdings[stockName] = { qty: qty, avgCost: avgCost };
+            // alert(stockName + ":" + holdings[stockName].qty + "/" + holdings[stockName].avgCost);
         }
     }
 
@@ -243,8 +260,8 @@ try {
         stockName = getStockName(tr);
         if (stockName !== null) {
             colorQtyColumn(tr, 1);
-            addOrdersColumn(tr, 1, stockName, activeBuyOrders, stockIOwn);
-            addOrdersColumn(tr, 2, stockName, activeSellOrders, stockIOwn);
+            addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
+            addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
         }
     }
 
@@ -256,8 +273,8 @@ try {
         stockName = getStockName(tr);
         if (stockName !== null) {
             colorQtyColumn(tr, 1);
-            addOrdersColumn(tr, 1, stockName, activeBuyOrders, shortedStock);
-            addOrdersColumn(tr, 2, stockName, activeSellOrders, shortedStock);
+            addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
+            addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
         }
     }
 
@@ -269,10 +286,10 @@ try {
         tr = activeOrdersBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
-            colorActiveOrdersColumns(tr, 1, 2);
-            addHoldingsColumn(tr, 1, stockName, stockIOwn);
-            addHoldingsColumn(tr, 2, stockName, shortedStock);
-            addHoldingsAverageCostColumn(tr, 3, stockName, stockIOwn, shortedStock);
+            colorActiveOrdersColumns(tr, 1, 2, holdings);
+            addHoldingsColumn(tr, 1, stockName, holdings, "Long");
+            addHoldingsColumn(tr, 2, stockName, holdings, "Short");
+            addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
         }
     }
 
@@ -286,11 +303,11 @@ try {
         tr = watchListBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
-            addHoldingsColumn(tr, 1, stockName, stockIOwn);
-            addHoldingsColumn(tr, 2, stockName, shortedStock);
-            addHoldingsAverageCostColumn(tr, 3, stockName, stockIOwn, shortedStock);
-            addOrdersColumn(tr, 4, stockName, activeBuyOrders, shortedStock);
-            addOrdersColumn(tr, 5, stockName, activeSellOrders, stockIOwn);
+            addHoldingsColumn(tr, 1, stockName, holdings, "Long");
+            addHoldingsColumn(tr, 2, stockName, holdings, "Short");
+            addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
+            addOrdersColumn(tr, 4, stockName, activeBuyOrders, holdings);
+            addOrdersColumn(tr, 5, stockName, activeSellOrders, holdings);
         }
     }
 
