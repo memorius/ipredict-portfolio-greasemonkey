@@ -7,23 +7,25 @@
 // ==/UserScript==
 
 /* This script customizes iPredict's My Portfolio page to add extra columns
-   correlating the current stock holdings with active orders and watchlist.
+   correlating the current stock holdings with active orders and watchlist,
+   and to add a persistent 'Notes' field for each portfolio line.
    It works purely on the information already on the page
    - it doesn't make any requests to the server.
+   The 'Notes' text is persisted in the local browser user profile,
+   using DOM Storage, so it is retained on coming back to the site later.
 
    It is for use as a userscript with Firefox and the Greasemonkey plugin:
    https://addons.mozilla.org/en-US/firefox/addon/748
 
-   Tested with Firefox 3.0.13 (Linux) and Greasemonkey 0.8.20090123.1
+   Tested with Firefox 3.0.14 (Linux) and Greasemonkey 0.8.20090920.2
 
    The script has the following limitations:
      - It will probably break if iPredict changes the page layout
-     - If there are enough entries in the 'active orders' list that it spans
-       multiple pages, then the 'active order' info added to the other tables
-       will only show the orders on the current page - the remaining info is
-       not available.
+     - Notes fields mess with the table alignment and show scrollbars,
+       since there isn't really enough horizontal space for them.
 
-   Author: Nick Clarke - memorius@gmail.com - http://planproof-fool.blogspot.com/ */
+   Author: Nick Clarke - memorius@gmail.com - http://planproof-fool.blogspot.com/
+*/
 
 /* This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
@@ -180,6 +182,49 @@ function qtyClass(qty) {
     return (qty > 0) ? "positive" : "negative";
 }
 
+function makeNoteKey(stockName, type) {
+    return "portfolioCustomization:" + stockName + ":" + type;
+}
+
+/* storeNote/getNote use DOM storage object for this domain - provides local persistent data storage.
+   This only works from Greasemonkey if I use wrappedJSObject: see here:
+      http://www.oreillynet.com/pub/a/network/2005/11/01/avoid-common-greasemonkey-pitfalls.html?page=5
+      DON'T use this code elsewhere unless you have read the above document -
+            I think there may be security implications,
+            depending on whether you trust the remote site. */
+function storeNote(stockName, type, noteText) {
+    var key = makeNoteKey(stockName, type);
+    if (noteText === null || noteText === "") {
+        window.wrappedJSObject.globalStorage[window.location.hostname].removeItem(key);
+    } else {
+        window.wrappedJSObject.globalStorage[window.location.hostname].setItem(key, noteText);
+    }
+}
+
+function getNote(stockName, type) {
+    var noteText = window.wrappedJSObject.globalStorage[window.location.hostname].getItem(makeNoteKey(stockName, type));
+    return (noteText === undefined) ? "" : noteText;
+}
+
+function addNotesColumn(tr, columnIndex, stockName, type) {
+    var markerTD = addTD(tr, columnIndex, ">>", "align-left");
+    var className = "align-left custom-notes";
+    var notesTD = addTD(tr, columnIndex + 1, null, className);
+    notesTD.style.display = "none"; // Initially hidden
+    var textArea = document.createElement("textarea");
+    textArea.value = getNote(stockName, type);
+    textArea.className = className;
+    notesTD.appendChild(textArea);
+    textArea.wrappedJSObject.onblur = function() {
+            storeNote(stockName, type, textArea.wrappedJSObject.value);
+        };
+    markerTD.wrappedJSObject.onclick = function() {
+            var show = (notesTD.style.display === "none");
+            notesTD.style.display = (show ? "inline" : "none");
+            markerTD.textContent = (show ? "<<" : ">>");
+        };
+}
+
 try {
     // Inject extra styles we will use for the new columns
     var style = document.createElement("style");
@@ -194,6 +239,15 @@ try {
              "td.custom-holdings-price {",
              "    color: #0061E4;",
              // "    color: #AAAA00;",
+             "}",
+             "td.custom-notes {",
+             "    padding: 0px !important;",
+             "}",
+             "textarea.custom-notes {",
+             "    height: 100px !important;",
+             "    width: 200px !important;",
+             "    margin: 0px !important;",
+             "    margin-left: 0px !important;",
              "}"
          ].join("\n");
     document.getElementsByTagName('head')[0].appendChild(style);
@@ -264,6 +318,7 @@ try {
     // Add columns to the Stock I Own table showing orders
     addHeaderColumn(stockIOwnTable, 1, "Buy",  "align-right");
     addHeaderColumn(stockIOwnTable, 2, "Sell", "align-right");
+    addHeaderColumn(stockIOwnTable, 10, "Notes", "align-left");
     for (i = 0; i < stockIOwnBodyRows.length; i++) {
         tr = stockIOwnBodyRows[i];
         stockName = getStockName(tr);
@@ -271,12 +326,14 @@ try {
             colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
+            addNotesColumn(tr, 10, stockName, "long");
         }
     }
 
     // Add columns to the Shorted Stock table showing orders
     addHeaderColumn(shortedStockTable, 1, "Buy",  "align-right");
     addHeaderColumn(shortedStockTable, 2, "Sell", "align-right");
+    addHeaderColumn(shortedStockTable, 10, "Notes", "align-left");
     for (i = 0; i < shortedStockBodyRows.length; i++) {
         tr = shortedStockBodyRows[i];
         stockName = getStockName(tr);
@@ -284,6 +341,7 @@ try {
             colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
+            addNotesColumn(tr, 10, stockName, "short");
         }
     }
 
@@ -291,6 +349,7 @@ try {
     addHeaderColumn(activeOrdersTable, 1, "Long",      "align-right");
     addHeaderColumn(activeOrdersTable, 2, "Short",     "align-right");
     addHeaderColumn(activeOrdersTable, 3, "Avg. Cost", "align-center");
+    addHeaderColumn(activeOrdersTable, 11, "Notes",    "align-left");
     for (i = 0; i < activeOrdersBodyRows.length; i++) {
         tr = activeOrdersBodyRows[i];
         stockName = getStockName(tr);
@@ -299,6 +358,7 @@ try {
             addHoldingsColumn(tr, 1, stockName, holdings, "Long");
             addHoldingsColumn(tr, 2, stockName, holdings, "Short");
             addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
+            addNotesColumn(tr, 11, stockName, "orders");
         }
     }
 
@@ -308,6 +368,7 @@ try {
     addHeaderColumn(watchListTable, 3, "Avg. Cost", "align-center");
     addHeaderColumn(watchListTable, 4, "Buy",       "align-right");
     addHeaderColumn(watchListTable, 5, "Sell",      "align-right");
+    addHeaderColumn(watchListTable, 10, "Notes",    "align-left");
     for (i = 0; i < watchListBodyRows.length; i++) {
         tr = watchListBodyRows[i];
         stockName = getStockName(tr);
@@ -317,6 +378,7 @@ try {
             addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
             addOrdersColumn(tr, 4, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 5, stockName, activeSellOrders, holdings);
+            addNotesColumn(tr, 10, stockName, "watch");
         }
     }
 
