@@ -93,11 +93,14 @@ function getStockPrice(tr, column) {
     return parseFloat(price.replace("$", ""));
 }
 
-function addHeaderColumn(table, columnIndex, text, className) {
+function addHeaderColumn(table, columnIndex, text, className, colSpan) {
     var thead = getHeaderRow(table);
     var th = document.createElement("th");
     th.appendChild(document.createTextNode(text));
     th.className = className;
+    if (colSpan) {
+        th.colSpan = colSpan;
+    }
     thead.insertBefore(th, thead.getChildren()[columnIndex]);
 }
 
@@ -203,26 +206,52 @@ function storeNote(stockName, type, noteText) {
 
 function getNote(stockName, type) {
     var noteText = window.wrappedJSObject.globalStorage[window.location.hostname].getItem(makeNoteKey(stockName, type));
-    return (noteText === undefined) ? "" : noteText;
+    return (noteText === undefined || noteText === null) ? "" : noteText;
+}
+
+function getNoteTeaser(noteText) {
+    // Take first few 10 chars, or stop at end of first line if less. Show '>' if empty.
+    var firstFewChars = (noteText + "").match(/^\s*(.{0,10})/)[1];
+    return (firstFewChars === "") ? ">" : firstFewChars;
 }
 
 function addNotesColumn(tr, columnIndex, stockName, type) {
-    var markerTD = addTD(tr, columnIndex, ">>", "align-left");
     var className = "align-left custom-notes";
-    var notesTD = addTD(tr, columnIndex + 1, null, className);
-    notesTD.style.display = "none"; // Initially hidden
+    var noteText = getNote(stockName, type);
+    var notesTD = addTD(tr, columnIndex, null, className);
+
+    var teaserDiv = notesTD.appendChild(document.createElement("div"));
+    teaserDiv.appendChild(document.createTextNode(getNoteTeaser(noteText)));
+
     var textArea = document.createElement("textarea");
-    textArea.value = getNote(stockName, type);
+    textArea.value = noteText;
     textArea.className = className;
+    textArea.style.display = "none"; // Initially hidden
     notesTD.appendChild(textArea);
-    textArea.wrappedJSObject.onblur = function() {
-            storeNote(stockName, type, textArea.wrappedJSObject.value);
-        };
-    markerTD.wrappedJSObject.onclick = function() {
-            var show = (notesTD.style.display === "none");
-            notesTD.style.display = (show ? "inline" : "none");
-            markerTD.textContent = (show ? "<<" : ">>");
-        };
+
+    var saveNote = function() {
+        storeNote(stockName, type, textArea.wrappedJSObject.value);
+    };
+    var toggleNote = function() {
+        var showTextArea = (textArea.style.display === "none");
+        if (showTextArea) {
+            teaserDiv.textContent = "<";
+            textArea.style.display = "";
+            textArea.focus();
+        } else {
+            teaserDiv.textContent = getNoteTeaser(textArea.wrappedJSObject.value);
+            textArea.style.display = "none";
+        }
+    };
+    textArea.wrappedJSObject.onblur = saveNote;
+    textArea.wrappedJSObject.onkeydown = function(e) {
+        // Close on pressing Escape
+        if (e.keyCode === 27) {
+            saveNote();
+            toggleNote();
+        }
+    };
+    teaserDiv.wrappedJSObject.onclick = toggleNote;
 }
 
 try {
@@ -318,7 +347,7 @@ try {
     // Add columns to the Stock I Own table showing orders
     addHeaderColumn(stockIOwnTable, 1, "Buy",  "align-right");
     addHeaderColumn(stockIOwnTable, 2, "Sell", "align-right");
-    addHeaderColumn(stockIOwnTable, 10, "Notes", "align-left");
+    addHeaderColumn(stockIOwnTable, 10, "Notes", "align-left", 2);
     for (i = 0; i < stockIOwnBodyRows.length; i++) {
         tr = stockIOwnBodyRows[i];
         stockName = getStockName(tr);
@@ -333,7 +362,7 @@ try {
     // Add columns to the Shorted Stock table showing orders
     addHeaderColumn(shortedStockTable, 1, "Buy",  "align-right");
     addHeaderColumn(shortedStockTable, 2, "Sell", "align-right");
-    addHeaderColumn(shortedStockTable, 10, "Notes", "align-left");
+    addHeaderColumn(shortedStockTable, 10, "Notes", "align-left", 2);
     for (i = 0; i < shortedStockBodyRows.length; i++) {
         tr = shortedStockBodyRows[i];
         stockName = getStockName(tr);
@@ -349,7 +378,7 @@ try {
     addHeaderColumn(activeOrdersTable, 1, "Long",      "align-right");
     addHeaderColumn(activeOrdersTable, 2, "Short",     "align-right");
     addHeaderColumn(activeOrdersTable, 3, "Avg. Cost", "align-center");
-    addHeaderColumn(activeOrdersTable, 11, "Notes",    "align-left");
+    addHeaderColumn(activeOrdersTable, 11, "Notes",    "align-left", 2);
     for (i = 0; i < activeOrdersBodyRows.length; i++) {
         tr = activeOrdersBodyRows[i];
         stockName = getStockName(tr);
@@ -368,7 +397,7 @@ try {
     addHeaderColumn(watchListTable, 3, "Avg. Cost", "align-center");
     addHeaderColumn(watchListTable, 4, "Buy",       "align-right");
     addHeaderColumn(watchListTable, 5, "Sell",      "align-right");
-    addHeaderColumn(watchListTable, 10, "Notes",    "align-left");
+    addHeaderColumn(watchListTable, 10, "Notes",    "align-left", 2);
     for (i = 0; i < watchListBodyRows.length; i++) {
         tr = watchListBodyRows[i];
         stockName = getStockName(tr);
