@@ -189,35 +189,55 @@ function makeNoteKey(stockName, type) {
     return "portfolioCustomization:" + stockName + ":" + type;
 }
 
+function getDOMStorage() {
+    return window.wrappedJSObject.globalStorage[window.location.hostname];
+}
+
 /* storeNote/getNote use DOM storage object for this domain - provides local persistent data storage.
    This only works from Greasemonkey if I use wrappedJSObject: see here:
       http://www.oreillynet.com/pub/a/network/2005/11/01/avoid-common-greasemonkey-pitfalls.html?page=5
       DON'T use this code elsewhere unless you have read the above document -
             I think there may be security implications,
             depending on whether you trust the remote site. */
-function storeNote(stockName, type, noteText) {
-    var key = makeNoteKey(stockName, type);
+function storeNote(noteKey, noteText) {
     if (noteText === null || noteText === "") {
-        window.wrappedJSObject.globalStorage[window.location.hostname].removeItem(key);
+        getDOMStorage().removeItem(noteKey);
     } else {
-        window.wrappedJSObject.globalStorage[window.location.hostname].setItem(key, noteText);
+        getDOMStorage().setItem(noteKey, noteText);
     }
 }
 
-function getNote(stockName, type) {
-    var noteText = window.wrappedJSObject.globalStorage[window.location.hostname].getItem(makeNoteKey(stockName, type));
+function getNote(noteKey) {
+    var noteText = getDOMStorage().getItem(noteKey);
     return (noteText === undefined || noteText === null) ? "" : noteText;
 }
 
+function removeUnusedNotes(noteKeysPresentOnScreen) {
+    // Must not remove while iterating because removal can change the order of the keys (hence their indexes)
+    var toRemove = [];
+    var storage = getDOMStorage();
+    var i, noteKey;
+    for (i = 0; i < storage.length; i++) {
+        noteKey = storage.key(i);
+        if (!noteKeysPresentOnScreen[noteKey]) {
+            toRemove.push(noteKey);
+        }
+    }
+    for (i = 0; i < toRemove.length; i++) {
+        noteKey = toRemove[i];
+        storage.removeItem(noteKey);
+    }
+}
+
 function getNoteTeaser(noteText) {
-    // Take first few 10 chars, or stop at end of first line if less. Show '>' if empty.
-    var firstFewChars = (noteText + "").match(/^\s*(.{0,10})/)[1];
+    // Take first few chars, or stop at end of first line if less. Show '>' if empty.
+    var firstFewChars = (noteText + "").match(/^\s*(.{0,19})/)[1];
     return (firstFewChars === "") ? ">" : firstFewChars;
 }
 
-function addNotesColumn(tr, columnIndex, stockName, type) {
+function addNotesColumn(tr, columnIndex, noteKey) {
     var className = "align-left custom-notes";
-    var noteText = getNote(stockName, type);
+    var noteText = getNote(noteKey);
     var notesTD = addTD(tr, columnIndex, null, className);
 
     var teaserDiv = notesTD.appendChild(document.createElement("div"));
@@ -230,7 +250,7 @@ function addNotesColumn(tr, columnIndex, stockName, type) {
     notesTD.appendChild(textArea);
 
     var saveNote = function() {
-        storeNote(stockName, type, textArea.wrappedJSObject.value);
+        storeNote(noteKey, textArea.wrappedJSObject.value);
     };
     var toggleNote = function() {
         var showTextArea = (textArea.style.display === "none");
@@ -348,14 +368,18 @@ try {
     addHeaderColumn(stockIOwnTable, 1, "Buy",  "align-right");
     addHeaderColumn(stockIOwnTable, 2, "Sell", "align-right");
     addHeaderColumn(stockIOwnTable, 10, "Notes", "align-left", 2);
+    var noteKey;
+    var noteKeysPresentOnScreen = [];
     for (i = 0; i < stockIOwnBodyRows.length; i++) {
         tr = stockIOwnBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            noteKey = makeNoteKey(stockName, "long");
+            noteKeysPresentOnScreen[noteKey] = true;
             colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
-            addNotesColumn(tr, 10, stockName, "long");
+            addNotesColumn(tr, 10, noteKey);
         }
     }
 
@@ -367,10 +391,12 @@ try {
         tr = shortedStockBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            noteKey = makeNoteKey(stockName, "short");
+            noteKeysPresentOnScreen[noteKey] = true;
             colorQtyColumn(tr, 1);
             addOrdersColumn(tr, 1, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 2, stockName, activeSellOrders, holdings);
-            addNotesColumn(tr, 10, stockName, "short");
+            addNotesColumn(tr, 10, noteKey);
         }
     }
 
@@ -383,11 +409,13 @@ try {
         tr = activeOrdersBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            noteKey = makeNoteKey(stockName, "orders");
+            noteKeysPresentOnScreen[noteKey] = true;
             colorActiveOrdersColumns(tr, 1, 2, holdings);
             addHoldingsColumn(tr, 1, stockName, holdings, "Long");
             addHoldingsColumn(tr, 2, stockName, holdings, "Short");
             addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
-            addNotesColumn(tr, 11, stockName, "orders");
+            addNotesColumn(tr, 11, noteKey);
         }
     }
 
@@ -402,14 +430,21 @@ try {
         tr = watchListBodyRows[i];
         stockName = getStockName(tr);
         if (stockName !== null) {
+            noteKey = makeNoteKey(stockName, "watch");
+            noteKeysPresentOnScreen[noteKey] = true;
             addHoldingsColumn(tr, 1, stockName, holdings, "Long");
             addHoldingsColumn(tr, 2, stockName, holdings, "Short");
             addHoldingsAverageCostColumn(tr, 3, stockName, holdings);
             addOrdersColumn(tr, 4, stockName, activeBuyOrders, holdings);
             addOrdersColumn(tr, 5, stockName, activeSellOrders, holdings);
-            addNotesColumn(tr, 10, stockName, "watch");
+            addNotesColumn(tr, 10, noteKey);
         }
     }
+
+    // Ensures that old notes (for cleared positions / deleted orders or watches)
+    // don't reappear with misleading values if a new position / order or watch
+    // is recreated
+    removeUnusedNotes(noteKeysPresentOnScreen);
 
     // alert("OK");
 } catch (e) {
