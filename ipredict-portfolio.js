@@ -231,7 +231,7 @@ function removeUnusedNotes(noteKeysPresentOnScreen) {
 
 function getNoteTeaser(noteText) {
     // Take first few chars, or stop at end of first line if less. Show '>' if empty.
-    var firstFewChars = (noteText + "").match(/^\s*(.{0,19})/)[1];
+    var firstFewChars = (noteText + "").match(/^\s*(.{0,15})/)[1];
     return (firstFewChars === "") ? ">" : firstFewChars;
 }
 
