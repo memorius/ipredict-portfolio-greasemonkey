@@ -61,7 +61,7 @@ function getHeaderRow(table) {
 }
 
 function getBodyRows(table) {
-    return table.getElement("tbody").getElementsByTagName("tr");
+    return table ? table.getElement("tbody").getElementsByTagName("tr") : [];
 }
 
 function getStockName(tr) {
@@ -94,6 +94,9 @@ function getStockPrice(tr, column) {
 }
 
 function addHeaderColumn(table, columnIndex, text, className, colSpan) {
+    if (!table) {
+        return;
+    }
     var thead = getHeaderRow(table);
     var th = document.createElement("th");
     th.appendChild(document.createTextNode(text));
