@@ -2,8 +2,8 @@
 // @name           iPredict-portfolio-improved-active-orders
 // @namespace      http://github.com/memorius/ipredict-portfolio-greasemonkey
 // @description    iPredict (My Portfolio): show active order info per holding and holdings per order
-// @include        https://www.ipredict.co.nz/Main.php?do=portfolio*
-// @include        https://www.ipredict.co.nz/Main.php?do=edit_order*
+// @include        https://www.ipredict.co.nz/app.php?do=portfolio*
+// @include        https://www.ipredict.co.nz/app.php?do=edit_order*
 // ==/UserScript==
 
 /* This script customizes iPredict's My Portfolio page to add extra columns
@@ -17,7 +17,7 @@
    It is for use as a userscript with Firefox and the Greasemonkey plugin:
    https://addons.mozilla.org/en-US/firefox/addon/748
 
-   Tested with Firefox 3.0.14 (Linux) and Greasemonkey 0.8.20090920.2
+   Tested with Firefox 3.5.9 (Linux) and Greasemonkey 0.8.20100408.6
 
    The script has the following limitations:
      - It will probably break if iPredict changes the page layout
